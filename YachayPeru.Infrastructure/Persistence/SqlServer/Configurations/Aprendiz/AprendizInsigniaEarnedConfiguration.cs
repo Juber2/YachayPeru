@@ -1,0 +1,37 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using YachayPeru.Domain.Entities.Aprendiz;
+using YachayPeru.Domain.Entities.Auth;
+using YachayPeru.Domain.Entities.Content;
+
+namespace YachayPeru.Infrastructure.Persistence.SqlServer.Configurations.Aprendiz
+{
+    public class AprendizInsigniaEarnedConfiguration : BaseEntityConfiguration<AprendizInsigniaEarned>
+    {
+        public override void Configure(EntityTypeBuilder<AprendizInsigniaEarned> builder)
+        {
+            base.Configure(builder);
+
+            builder.ToTable("aprendiz_insignias_earned", "aprendiz");
+
+            builder.Property(e => e.UserId).IsRequired();
+            builder.Property(e => e.InsigniaId).IsRequired();
+            builder.Property(e => e.EarnedAt).IsRequired();
+
+            builder.HasIndex(e => new { e.UserId, e.InsigniaId })
+                   .IsUnique()
+                   .HasDatabaseName("ux_aprendiz_insignias_earned_user_insignia")
+                   .HasFilter("[Deleted] = 0");
+
+            builder.HasOne<User>()
+                   .WithMany()
+                   .HasForeignKey(e => e.UserId)
+                   .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasOne<Insignia>()
+                   .WithMany()
+                   .HasForeignKey(e => e.InsigniaId)
+                   .OnDelete(DeleteBehavior.Cascade);
+        }
+    }
+}

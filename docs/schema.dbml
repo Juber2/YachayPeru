@@ -1,0 +1,662 @@
+// ─── COMMON ──────────────────────────────────────────────────────────────────
+Table common.master_codes {
+  id int [pk]
+  parent_code varchar [null]
+  code varchar [unique]
+  name varchar
+  value varchar [null]
+  description varchar [null]
+  order_index int
+  is_active boolean
+}
+// parent_code es autorreferencial (catálogo jerárquico
+// categoría -> subcategoría). Sin esta FK, nada impedía insertar un
+// parent_code que no existiera en la propia tabla.
+Ref: common.master_codes.parent_code > common.master_codes.code
+
+// ruc es único FILTRADO: solo entre empresas vivas (WHERE deleted = 0).
+// Con soft-delete, un RUC de empresa borrada bloqueaba el re-registro.
+Table common.companies {
+  id int [pk]
+  company_name varchar
+  ruc varchar
+  email varchar
+  phone varchar
+  status_code varchar
+  employee_limit int [null]
+  notes varchar [null]
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+  deleted boolean
+
+  indexes {
+    (ruc) [unique, name: 'ux_companies_ruc', note: 'Filtrado en DDL real: WHERE deleted = 0']
+  }
+}
+Ref: common.companies.status_code > common.master_codes.code
+
+Table common.persons {
+  id int [pk]
+  first_name varchar
+  last_name varchar
+  document_type varchar [null]
+  document_number varchar [null]
+  birth_date datetime [null]
+  business_name varchar [null]
+  ruc varchar [null]
+  legal_representative varchar [null]
+  phone varchar [null]
+  address varchar [null]
+  city varchar [null]
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+  deleted boolean
+
+  indexes {
+    (document_number) [unique, note: 'Filtrado en DDL real: WHERE document_number IS NOT NULL AND deleted = 0']
+    (ruc) [unique, note: 'Filtrado en DDL real: WHERE ruc IS NOT NULL AND deleted = 0']
+  }
+}
+
+// ─── ACCESS ──────────────────────────────────────────────────────────────────
+Table access.resources {
+  id int [pk]
+  code varchar [unique]
+  name varchar
+  scope varchar    // valor del master_code: RESOURCE_SCOPES_PLATFORM | RESOURCE_SCOPES_TENANT
+}
+
+Table access.permissions {
+  id int [pk]
+  resource_id int
+  permission_code varchar
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+  deleted boolean
+}
+Ref: access.permissions.resource_id > access.resources.id
+Ref: access.permissions.permission_code > common.master_codes.code
+
+// role_code referencia master_codes por valor (sin FK declarada en EF —
+// la relación es lógica, no estructural en el esquema).
+Table access.platform_roles {
+  id int [pk]
+  role_code varchar [null]
+  name varchar
+  description varchar [null]
+  is_for_companies boolean
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+  deleted boolean
+
+  indexes {
+    (role_code) [unique, note: 'Filtrado en DDL real: WHERE role_code IS NOT NULL AND deleted = 0']
+  }
+}
+
+Table access.platform_role_permissions {
+  id int [pk]
+  platform_role_id int
+  permission_id int
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+  deleted boolean
+}
+Ref: access.platform_role_permissions.platform_role_id > access.platform_roles.id
+Ref: access.platform_role_permissions.permission_id > access.permissions.id
+
+Table access.tenant_roles {
+  id int [pk]
+  company_id int
+  role_code varchar [null]
+  name varchar
+  description varchar [null]
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+  deleted boolean
+}
+Ref: access.tenant_roles.company_id > common.companies.id
+Ref: access.tenant_roles.role_code > common.master_codes.code
+
+Table access.tenant_role_permissions {
+  id int [pk]
+  tenant_role_id int
+  permission_id int
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+  deleted boolean
+}
+Ref: access.tenant_role_permissions.tenant_role_id > access.tenant_roles.id
+Ref: access.tenant_role_permissions.permission_id > access.permissions.id
+
+// ─── AUTH ─────────────────────────────────────────────────────────────────────
+// username y email son únicos FILTRADOS por deleted.
+// username no tenía NINGÚN unique — colisión = agujero de autenticación.
+// email es nullable, así que su unique además excluye NULLs en el DDL real.
+//
+// INVARIANTES DE ROLES (sostenidas por la app, no por el esquema):
+//   - is_multi_tenant habilita que el usuario reciba roles is_for_companies=true
+//     acotados a empresas. Flag desactivado => acceso cortado aunque existan
+//     filas en user_platform_role_companies.
+//   - platform_roles (is_for_companies=true) y tenant_roles son catálogos
+//     SEPARADOS: ejercen poderes cualitativamente distintos.
+Table auth.users {
+  id int [pk]
+  person_id int
+  user_type_code varchar
+  username varchar
+  password varchar
+  email varchar [null]
+  locked_until datetime [null]
+  is_locked boolean
+  locked_reason varchar [null]
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+  deleted boolean
+
+  indexes {
+    (username) [unique, name: 'ux_users_username', note: 'Filtrado en DDL real: WHERE deleted = 0']
+    (email) [unique, name: 'ux_users_email', note: 'Filtrado en DDL real: WHERE deleted = 0 AND email IS NOT NULL']
+  }
+}
+Ref: auth.users.person_id > common.persons.id
+Ref: auth.users.user_type_code > common.master_codes.code
+
+// RefreshToken no extiende BaseEntity: sin created_by, updated_at, updated_by, deleted.
+// Columnas de sesión sospechosa: is_pending_approval bloquea el token hasta
+// que el usuario apruebe desde otro dispositivo (flujo anti-hijacking).
+Table auth.refresh_tokens {
+  id int [pk]
+  user_id int
+  token varchar [unique]
+  login_ip varchar [null]
+  login_user_agent varchar [null]
+  expires_at datetime
+  is_revoked boolean
+  replaced_by_token varchar [null]
+  is_pending_approval boolean
+  approval_token varchar [null]
+  approval_expires_at datetime [null]
+  suspicious_ip varchar [null]
+  created_at datetime
+}
+Ref: auth.refresh_tokens.user_id > auth.users.id [delete: cascade]
+
+Table auth.user_platform_roles {
+  id int [pk]
+  user_id int
+  platform_role_id int [null]
+  is_multi_tenant boolean
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+  deleted boolean
+}
+Ref: auth.user_platform_roles.user_id > auth.users.id
+Ref: auth.user_platform_roles.platform_role_id > access.platform_roles.id
+
+Table auth.user_platform_role_companies {
+  id int [pk]
+  user_id int
+  platform_company_role_id int
+  company_id int
+  created_at datetime
+  created_by int
+  deleted boolean
+}
+Ref: auth.user_platform_role_companies.user_id > auth.users.id
+Ref: auth.user_platform_role_companies.platform_company_role_id > access.platform_roles.id
+Ref: auth.user_platform_role_companies.company_id > common.companies.id
+
+Table auth.user_tenant_roles {
+  id int [pk]
+  user_id int
+  tenant_role_id int
+  created_at datetime
+  created_by int
+  deleted boolean
+}
+Ref: auth.user_tenant_roles.user_id > auth.users.id
+Ref: auth.user_tenant_roles.tenant_role_id > access.tenant_roles.id
+
+Table auth.user_password_changes {
+  id int [pk]
+  user_id int
+  password varchar
+  created_at datetime
+}
+Ref: auth.user_password_changes.user_id > auth.users.id
+
+// ─── LOG ─────────────────────────────────────────────────────────────────────
+Table log.audits {
+  id int [pk]
+  table_name varchar
+  record_id varchar
+  action varchar
+  user_id int
+  changed_at datetime
+  old_values json [null]
+  new_values json [null]
+
+  indexes {
+    (table_name, record_id) [name: 'ix_audits_table_record']
+  }
+}
+
+Table log.login_attempts {
+  id int [pk]
+  username varchar
+  ip_address varchar
+  user_agent varchar
+  attempted_at datetime
+  success boolean
+  failure_reason varchar [null]
+}
+
+Table log.email_notifications {
+  id int [pk]
+  mail varchar
+  cc varchar [null]
+  affair varchar
+  message text
+  notification_type varchar
+  status varchar
+  created_at datetime
+}
+
+// ─── COURSE ───────────────────────────────────────────────────────────────────
+// is_template=true → curso plantilla gestionado por SuperAdmin (owner_company_id=null).
+// is_template=false + owner_company_id=X → curso propio de la empresa X.
+// source_template_id → si es copia de plantilla, referencia al original.
+// Asignar una plantilla a una empresa crea un nuevo courses con is_template=false,
+// owner_company_id=X, source_template_id=<plantilla>, copiando la versión publicada actual.
+// Editar la plantilla original NO afecta las copias ya creadas.
+Table course.courses {
+  id int [pk]
+  title varchar
+  description text [null]
+  is_active boolean
+  is_template boolean
+  owner_company_id int [null]
+  source_template_id int [null]
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+  deleted boolean
+}
+
+// is_current: máximo una true por course_id.
+// Índice único filtrado pendiente: WHERE is_current = 1 AND deleted = 0
+Table course.course_versions {
+  id int [pk]
+  course_id int
+  version_number int
+  status_code varchar
+  duration_hours decimal
+  is_current boolean
+  published_at datetime [null]
+  published_by int [null]
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+  deleted boolean
+
+  indexes {
+    (course_id) [unique, name: 'ux_course_versions_is_current', note: 'Filtrado en DDL real: WHERE is_current = 1 AND deleted = 0']
+  }
+}
+Ref: course.course_versions.course_id > course.courses.id
+Ref: course.course_versions.status_code > common.master_codes.code
+Ref: course.courses.owner_company_id > common.companies.id
+Ref: course.courses.source_template_id > course.courses.id
+
+// course_companies ELIMINADA — el ownership de empresa está directo en
+// courses.owner_company_id. Asignar = copiar. No hay tabla puente.
+
+// exam_template_id y course_version_id se fijan al ASIGNAR el curso,
+// no al iniciarlo — riesgo de desfase aceptado como decisión de negocio.
+// company_id es FK directa a companies.
+Table course.person_courses {
+  id int [pk]
+  person_id int
+  course_version_id int
+  exam_template_id int [null]
+  company_id int
+  status_code varchar
+  progress_percentage decimal
+  start_date datetime
+  completion_date datetime [null]
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+  deleted boolean
+}
+Ref: course.person_courses.person_id > common.persons.id
+Ref: course.person_courses.course_version_id > course.course_versions.id
+Ref: course.person_courses.exam_template_id > assessment.exam_templates.id
+Ref: course.person_courses.company_id > common.companies.id
+Ref: course.person_courses.status_code > common.master_codes.code
+
+Table course.course_modules {
+  id int [pk]
+  course_version_id int
+  title varchar
+  description varchar [null]
+  order_index int
+  duration_hours decimal
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+  deleted boolean
+}
+Ref: course.course_modules.course_version_id > course.course_versions.id
+
+Table course.module_content_types {
+  id int [pk]
+  description varchar
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+  deleted boolean
+}
+
+Table course.module_contents {
+  id int [pk]
+  module_id int
+  module_content_type_id int
+  text varchar [null]
+  order_index int
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+  deleted boolean
+}
+Ref: course.module_contents.module_id > course.course_modules.id
+Ref: course.module_contents.module_content_type_id > course.module_content_types.id
+
+// file_type_code conectado a master_codes — asume conjunto cerrado
+// (pdf/video/imagen/link). Si se suben extensiones arbitrarias, revertir a varchar libre.
+Table course.module_content_files {
+  id int [pk]
+  module_content_id int
+  file_type_code varchar
+  file_url varchar
+  order_index int
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+  deleted boolean
+}
+Ref: course.module_content_files.module_content_id > course.module_contents.id
+Ref: course.module_content_files.file_type_code > common.master_codes.code
+
+// course_id apunta al curso de la empresa (owner_company_id=X, is_template=false).
+// El diseño de certificado es por curso-empresa: cada copia del curso tiene su propio template.
+Table course.certificate_templates {
+  id int [pk]
+  course_id int
+  template_name varchar
+  template_url varchar
+  certificate_text text
+  is_active boolean
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+  deleted boolean
+}
+Ref: course.certificate_templates.course_id > course.courses.id
+
+// certificate_number único FILTRADO por deleted.
+// Si la numeración ya es irrepetible por diseño, el filtro es defensivo.
+// Si se reusan números tras revocar, el filtro es necesario.
+Table course.certificates {
+  id int [pk]
+  person_course_id int
+  certificate_template_id int
+  certificate_number varchar
+  certificate_url varchar
+  issue_date datetime
+  issued_by int
+  is_revoked boolean
+  revoked_at datetime [null]
+  revoked_by int [null]
+  revoked_reason text [null]
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+  deleted boolean
+
+  indexes {
+    (certificate_number) [unique, name: 'ux_certificates_number', note: 'Filtrado en DDL real: WHERE deleted = 0']
+  }
+}
+Ref: course.certificates.person_course_id > course.person_courses.id
+Ref: course.certificates.certificate_template_id > course.certificate_templates.id
+
+// ─── ASSESSMENT ───────────────────────────────────────────────────────────────
+Table assessment.exam_templates {
+  id int [pk]
+  course_id int
+  version_number int
+  status_code varchar
+  title varchar
+  passing_score decimal
+  time_limit_minutes int
+  max_attempts int
+  shuffle_question_order boolean
+  shuffle_option_order boolean
+  show_results_at_end boolean
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+  deleted boolean
+}
+Ref: assessment.exam_templates.course_id > course.courses.id
+Ref: assessment.exam_templates.status_code > common.master_codes.code
+
+// response_mode_code varchar + FK a master_codes en lugar de boolean —
+// "modo" implica conjunto de valores, no sí/no. Ahora es catálogo,
+// consistente con el resto de columnas _code del esquema.
+Table assessment.question_types {
+  id int [pk]
+  code varchar [unique]
+  name varchar
+  description varchar [null]
+  response_mode_code varchar
+  requires_options boolean
+  is_active boolean
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+  deleted boolean
+}
+Ref: assessment.question_types.response_mode_code > common.master_codes.code
+
+Table assessment.exam_template_questions {
+  id int [pk]
+  exam_template_id int
+  question_type_id int
+  question_text text
+  points decimal
+  order_index int
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+  deleted boolean
+}
+Ref: assessment.exam_template_questions.exam_template_id > assessment.exam_templates.id
+Ref: assessment.exam_template_questions.question_type_id > assessment.question_types.id
+
+// Separado de blanks: mezclar ambos en una tabla generaba columnas
+// válidas solo a medias según el tipo de pregunta.
+Table assessment.exam_template_question_choices {
+  id int [pk]
+  exam_template_question_id int
+  text text
+  is_correct boolean
+  order_index int
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+  deleted boolean
+}
+Ref: assessment.exam_template_question_choices.exam_template_question_id > assessment.exam_template_questions.id
+
+Table assessment.exam_template_question_blanks {
+  id int [pk]
+  exam_template_question_id int
+  blank_index int
+  correct_answer varchar
+  order_index int
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+  deleted boolean
+}
+Ref: assessment.exam_template_question_blanks.exam_template_question_id > assessment.exam_template_questions.id
+
+// person_course_id ata cada instancia a un ciclo de inscripción,
+// evitando ambigüedad si la persona vuelve a cursar el mismo curso.
+Table assessment.exam_instances {
+  id int [pk]
+  exam_template_id int
+  person_course_id int
+  generated_at datetime
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+  deleted boolean
+}
+Ref: assessment.exam_instances.exam_template_id > assessment.exam_templates.id
+Ref: assessment.exam_instances.person_course_id > course.person_courses.id
+
+Table assessment.exam_instance_questions {
+  id int [pk]
+  exam_instance_id int
+  exam_template_question_id int
+  order_index int
+  created_at datetime
+  created_by int
+  deleted boolean
+}
+Ref: assessment.exam_instance_questions.exam_instance_id > assessment.exam_instances.id
+Ref: assessment.exam_instance_questions.exam_template_question_id > assessment.exam_template_questions.id
+
+Table assessment.exam_instance_question_choices {
+  id int [pk]
+  exam_instance_question_id int
+  exam_template_question_choice_id int
+  order_index int
+  created_at datetime
+  created_by int
+}
+Ref: assessment.exam_instance_question_choices.exam_instance_question_id > assessment.exam_instance_questions.id
+Ref: assessment.exam_instance_question_choices.exam_template_question_choice_id > assessment.exam_template_question_choices.id
+
+Table assessment.exam_instance_question_blanks {
+  id int [pk]
+  exam_instance_question_id int
+  exam_template_question_blank_id int
+  order_index int
+  created_at datetime
+  created_by int
+}
+Ref: assessment.exam_instance_question_blanks.exam_instance_question_id > assessment.exam_instance_questions.id
+Ref: assessment.exam_instance_question_blanks.exam_template_question_blank_id > assessment.exam_template_question_blanks.id
+
+// status_code distingue in_progress | submitted | expired | abandoned.
+// Sin esto, solo started_at/submitted_at [null] era indistinguible entre
+// "rindiendo ahora" y "abandonó sin enviar" — riesgo si max_attempts
+// cuenta filas sin esa distinción.
+Table assessment.exam_instance_attempts {
+  id int [pk]
+  exam_instance_id int
+  attempt_number int
+  status_code varchar
+  score decimal
+  started_at datetime
+  submitted_at datetime [null]
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+  deleted boolean
+}
+Ref: assessment.exam_instance_attempts.exam_instance_id > assessment.exam_instances.id
+Ref: assessment.exam_instance_attempts.status_code > common.master_codes.code
+
+// answer_text eliminado de choice_answers: solo aplica a blanks.
+Table assessment.exam_instance_question_choice_answers {
+  id int [pk]
+  exam_instance_attempt_id int
+  exam_instance_question_choice_id int
+  is_correct boolean
+  points decimal
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+}
+Ref: assessment.exam_instance_question_choice_answers.exam_instance_attempt_id > assessment.exam_instance_attempts.id
+Ref: assessment.exam_instance_question_choice_answers.exam_instance_question_choice_id > assessment.exam_instance_question_choices.id
+
+Table assessment.exam_instance_question_blank_answers {
+  id int [pk]
+  exam_instance_attempt_id int
+  exam_instance_question_blank_id int
+  answer_text varchar
+  is_correct boolean
+  points decimal
+  created_at datetime
+  created_by int
+  updated_at datetime [null]
+  updated_by int [null]
+}
+Ref: assessment.exam_instance_question_blank_answers.exam_instance_attempt_id > assessment.exam_instance_attempts.id
+Ref: assessment.exam_instance_question_blank_answers.exam_instance_question_blank_id > assessment.exam_instance_question_blanks.id
+
+// ─── NOTIFICATION ─────────────────────────────────────────────────────────────
+Table notification.notifications {
+  id int [pk]
+  user_id int
+  title varchar
+  message text
+  notification_type_code varchar
+  is_read boolean
+  created_at datetime
+  created_by int
+}
+Ref: notification.notifications.user_id > auth.users.id
+Ref: notification.notifications.notification_type_code > common.master_codes.code
