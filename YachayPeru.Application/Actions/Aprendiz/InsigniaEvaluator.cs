@@ -186,12 +186,13 @@ namespace YachayPeru.Application.Actions.Aprendiz
 
         private async Task<IReadOnlyList<string>> GetPassedQuestionTypeCodesAsync(HashSet<int> passedRetoIds, CancellationToken ct)
         {
-            var versionIds = new List<int>();
-            foreach (var retoId in passedRetoIds)
-            {
-                var published = await versionRepository.GetPublishedByRetoAsync(retoId, ct);
-                if (published is not null) versionIds.Add(published.Id);
-            }
+            var publishedVersions = await versionRepository.ListAsync(
+                v => passedRetoIds.Contains(v.RetoId) && v.StatusCode == AppConstants.RetoVersionStatus.Published, ct);
+
+            var versionIds = publishedVersions
+                .GroupBy(v => v.RetoId)
+                .Select(g => g.OrderByDescending(v => v.VersionNumber).First().Id)
+                .ToList();
 
             if (versionIds.Count == 0) return [];
             return await questionRepository.GetDistinctQuestionTypeCodesByRetoVersionIdsAsync(versionIds, ct);
@@ -199,13 +200,8 @@ namespace YachayPeru.Application.Actions.Aprendiz
 
         private async Task<Dictionary<int, string?>> GetZonesByRegionIdsAsync(IReadOnlyList<int> regionIds, CancellationToken ct)
         {
-            var zones = new Dictionary<int, string?>();
-            foreach (var regionId in regionIds)
-            {
-                var course = await courseRepository.GetByIdAsync(regionId, ct);
-                zones[regionId] = course?.ZoneCode;
-            }
-            return zones;
+            var courses = await courseRepository.ListAsync(c => regionIds.Contains(c.Id), ct);
+            return courses.ToDictionary(c => c.Id, c => c.ZoneCode);
         }
     }
 }
