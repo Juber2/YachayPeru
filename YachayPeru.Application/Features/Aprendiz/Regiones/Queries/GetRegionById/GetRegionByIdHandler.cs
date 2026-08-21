@@ -5,6 +5,7 @@ using YachayPeru.Application.Abstractions.Persistence.Assessment;
 using YachayPeru.Application.Abstractions.Persistence.Learning;
 using YachayPeru.Application.Abstractions.Services;
 using YachayPeru.Application.Common.Results;
+using YachayPeru.Domain.Constants;
 using YachayPeru.Domain.Entities.Aprendiz;
 using static YachayPeru.Application.Common.Results.ResultCodes;
 
@@ -103,17 +104,16 @@ namespace YachayPeru.Application.Features.Aprendiz.Regiones.Queries.GetRegionByI
             }
 
             var retos = await retoRepository.GetByCourseAsync(region.Id, ct);
-            var retoCount = 0;
-            var completedRetoCount = 0;
-            foreach (var reto in retos)
-            {
-                var published = await versionRepository.GetPublishedByRetoAsync(reto.Id, ct);
-                if (published is null) continue;
+            var retoIds = retos.Select(r => r.Id).ToList();
 
-                retoCount++;
-                if (await attemptRepository.HasPassedAsync(request.UserId, reto.Id, ct))
-                    completedRetoCount++;
-            }
+            var publishedVersions = await versionRepository.ListAsync(
+                v => retoIds.Contains(v.RetoId) && v.StatusCode == AppConstants.RetoVersionStatus.Published, ct);
+            var publishedRetoIds = publishedVersions.Select(v => v.RetoId).ToHashSet();
+
+            var passedRetoIds = (await attemptRepository.GetPassedRetoIdsByUserAsync(request.UserId, ct)).ToHashSet();
+
+            var retoCount = publishedRetoIds.Count;
+            var completedRetoCount = publishedRetoIds.Count(passedRetoIds.Contains);
 
             await activityRepository.AddAsync(new AprendizActivityLog
             {

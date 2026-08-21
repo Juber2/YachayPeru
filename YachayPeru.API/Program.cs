@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using YachayPeru.API.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
@@ -143,6 +144,18 @@ builder.Services.AddCors(options =>
     });
 });
 var app = builder.Build();
+
+// Detrás de Nginx, este proceso solo recibe HTTP puertas adentro (el certificado TLS lo maneja
+// Nginx). Sin esto, request.Scheme siempre da "http" y las URLs absolutas (imágenes, etc.) se
+// arman como http:// aunque el sitio se sirva por https:// -> "Mixed Content" en el navegador.
+var forwardedHeadersOptions = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+};
+forwardedHeadersOptions.KnownIPNetworks.Clear();
+forwardedHeadersOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedHeadersOptions);
+
 app.UseCors("AllowAngular");
 if (app.Environment.IsDevelopment())
 {
