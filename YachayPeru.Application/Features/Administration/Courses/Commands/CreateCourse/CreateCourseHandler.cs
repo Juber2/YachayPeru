@@ -16,7 +16,9 @@ namespace YachayPeru.Application.Features.Administration.Courses.Commands.Create
             {
                 Title = request.Title,
                 Description = request.Description,
-                ZoneCode = request.ZoneCode
+                ZoneCode = request.ZoneCode,
+                AmbientAudioTitle = request.AmbientAudioTitle,
+                SpotifyUrl = request.SpotifyUrl
             }, cancellationToken);
     }
 }

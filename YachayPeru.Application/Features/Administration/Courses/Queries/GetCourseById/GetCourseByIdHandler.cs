@@ -26,6 +26,9 @@ namespace YachayPeru.Application.Features.Administration.Courses.Queries.GetCour
                 CoverImageUrl = course.CoverImageUrl,
                 SourceTemplateId = course.SourceTemplateId,
                 ZoneCode = course.ZoneCode,
+                AmbientAudioUrl = course.AmbientAudioUrl,
+                AmbientAudioTitle = course.AmbientAudioTitle,
+                SpotifyUrl = course.SpotifyUrl,
                 CreatedAt = course.CreatedAt
             });
         }

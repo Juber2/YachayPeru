@@ -19,6 +19,9 @@ namespace YachayPeru.API.Contracts.Administration.Courses.Response
         public string? CoverImageUrl { get; init; }
         public int? SourceTemplateId { get; init; }
         public string? ZoneCode { get; init; }
+        public string? AmbientAudioUrl { get; init; }
+        public string? AmbientAudioTitle { get; init; }
+        public string? SpotifyUrl { get; init; }
         public DateTime CreatedAt { get; init; }
     }
 }

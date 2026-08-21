@@ -54,6 +54,9 @@ namespace YachayPeru.API.Controllers.Aprendiz
                 Title = d.Title,
                 Description = d.Description,
                 CoverImageUrl = Request.ToAbsoluteUrl(d.CoverImageUrl),
+                AmbientAudioUrl = Request.ToAbsoluteUrl(d.AmbientAudioUrl),
+                AmbientAudioTitle = d.AmbientAudioTitle,
+                SpotifyUrl = d.SpotifyUrl,
                 Modules = d.Modules.Select(m => new AprendizModuleResponse
                 {
                     Id = m.Id,

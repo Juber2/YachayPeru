@@ -16,6 +16,9 @@ namespace YachayPeru.API.Contracts.Aprendiz.Regiones.Response
         public string Title { get; init; } = string.Empty;
         public string? Description { get; init; }
         public string? CoverImageUrl { get; init; }
+        public string? AmbientAudioUrl { get; init; }
+        public string? AmbientAudioTitle { get; init; }
+        public string? SpotifyUrl { get; init; }
         public List<AprendizModuleResponse> Modules { get; init; } = [];
         public int RetoCount { get; init; }
         public int CompletedRetoCount { get; init; }

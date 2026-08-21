@@ -10,6 +10,7 @@ using YachayPeru.Application.Features.Administration.Courses.Commands.CreateCour
 using YachayPeru.Application.Features.Administration.Courses.Commands.DeleteCourse;
 using YachayPeru.Application.Features.Administration.Courses.Commands.EditCourse;
 using YachayPeru.Application.Features.Administration.Courses.Commands.UploadCoverImage;
+using YachayPeru.Application.Features.Administration.Courses.Commands.UploadAmbientAudio;
 using YachayPeru.Application.Features.Administration.Courses.Queries.GetCourseById;
 using YachayPeru.Application.Features.Administration.Courses.Queries.GetCourses;
 
@@ -58,6 +59,9 @@ namespace YachayPeru.API.Controllers.Administration
                 CoverImageUrl    = Request.ToAbsoluteUrl(detail.CoverImageUrl),
                 SourceTemplateId = detail.SourceTemplateId,
                 ZoneCode         = detail.ZoneCode,
+                AmbientAudioUrl   = Request.ToAbsoluteUrl(detail.AmbientAudioUrl),
+                AmbientAudioTitle = detail.AmbientAudioTitle,
+                SpotifyUrl        = detail.SpotifyUrl,
                 CreatedAt        = detail.CreatedAt
             }));
         }
@@ -70,7 +74,9 @@ namespace YachayPeru.API.Controllers.Administration
             {
                 Title       = request.Title,
                 Description = request.Description,
-                ZoneCode    = request.ZoneCode
+                ZoneCode    = request.ZoneCode,
+                AmbientAudioTitle = request.AmbientAudioTitle,
+                SpotifyUrl        = request.SpotifyUrl
             }, ct);
             return this.FromResult(result);
         }
@@ -85,7 +91,9 @@ namespace YachayPeru.API.Controllers.Administration
                 Title       = request.Title,
                 Description = request.Description,
                 IsActive    = request.IsActive,
-                ZoneCode    = request.ZoneCode
+                ZoneCode    = request.ZoneCode,
+                AmbientAudioTitle = request.AmbientAudioTitle,
+                SpotifyUrl        = request.SpotifyUrl
             }, ct);
             return this.FromResult(result);
         }
@@ -107,6 +115,24 @@ namespace YachayPeru.API.Controllers.Administration
 
             await using var stream = file.OpenReadStream();
             var result = await mediator.Send(new UploadCoverImageCommand
+            {
+                Id = id,
+                FileStream = stream,
+                FileName = file.FileName
+            }, ct);
+            if (!result.IsSuccess) return this.FromResult(result);
+            return Ok(ApiResponse<string>.Ok(Request.ToAbsoluteUrl(result.Value)));
+        }
+
+        [HttpPost("courses/{id:int}/ambient-audio")]
+        [Authorize(Policy = AppPermissions.CursosPlantilla.Update)]
+        public async Task<IActionResult> UploadAmbientAudio(int id, IFormFile file, CancellationToken ct)
+        {
+            if (file is null || file.Length == 0)
+                return BadRequest(ApiResponse<string>.Fail("No se recibió ningún archivo."));
+
+            await using var stream = file.OpenReadStream();
+            var result = await mediator.Send(new UploadAmbientAudioCommand
             {
                 Id = id,
                 FileStream = stream,

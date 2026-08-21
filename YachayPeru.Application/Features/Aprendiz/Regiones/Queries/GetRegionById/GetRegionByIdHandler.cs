@@ -177,6 +177,9 @@ namespace YachayPeru.Application.Features.Aprendiz.Regiones.Queries.GetRegionByI
                 Title = region.Title,
                 Description = region.Description,
                 CoverImageUrl = region.CoverImageUrl,
+                AmbientAudioUrl = region.AmbientAudioUrl,
+                AmbientAudioTitle = region.AmbientAudioTitle,
+                SpotifyUrl = region.SpotifyUrl,
                 Modules = modules,
                 RetoCount = retoCount,
                 CompletedRetoCount = completedRetoCount

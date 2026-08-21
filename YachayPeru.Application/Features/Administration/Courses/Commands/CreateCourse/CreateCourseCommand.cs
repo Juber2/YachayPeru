@@ -8,5 +8,7 @@ namespace YachayPeru.Application.Features.Administration.Courses.Commands.Create
         public string Title { get; init; } = default!;
         public string? Description { get; init; }
         public string? ZoneCode { get; init; }
+        public string? AmbientAudioTitle { get; init; }
+        public string? SpotifyUrl { get; init; }
     }
 }

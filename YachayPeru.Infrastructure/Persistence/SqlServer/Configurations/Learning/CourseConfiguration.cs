@@ -18,6 +18,9 @@ namespace YachayPeru.Infrastructure.Persistence.SqlServer.Configurations.Learnin
             builder.Property(e => e.SourceTemplateId);
             builder.Property(e => e.CoverImageUrl).HasMaxLength(2000);
             builder.Property(e => e.ZoneCode).HasMaxLength(20);
+            builder.Property(e => e.AmbientAudioUrl).HasMaxLength(2000);
+            builder.Property(e => e.AmbientAudioTitle).HasMaxLength(200);
+            builder.Property(e => e.SpotifyUrl).HasMaxLength(500);
 
             builder.HasOne<Course>()
                    .WithMany()

@@ -10,5 +10,7 @@ namespace YachayPeru.Application.Features.Administration.Courses.Commands.EditCo
         public string? Description { get; init; }
         public bool IsActive { get; init; }
         public string? ZoneCode { get; init; }
+        public string? AmbientAudioTitle { get; init; }
+        public string? SpotifyUrl { get; init; }
     }
 }

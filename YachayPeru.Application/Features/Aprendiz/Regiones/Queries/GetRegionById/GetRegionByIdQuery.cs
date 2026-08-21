@@ -11,6 +11,9 @@ namespace YachayPeru.Application.Features.Aprendiz.Regiones.Queries.GetRegionByI
         public string Title { get; set; } = string.Empty;
         public string? Description { get; set; }
         public string? CoverImageUrl { get; set; }
+        public string? AmbientAudioUrl { get; set; }
+        public string? AmbientAudioTitle { get; set; }
+        public string? SpotifyUrl { get; set; }
         public List<AprendizModule> Modules { get; set; } = [];
         public int RetoCount { get; set; }
         public int CompletedRetoCount { get; set; }

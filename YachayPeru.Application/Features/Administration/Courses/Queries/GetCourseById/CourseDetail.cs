@@ -9,6 +9,9 @@ namespace YachayPeru.Application.Features.Administration.Courses.Queries.GetCour
         public string? CoverImageUrl { get; set; }
         public int? SourceTemplateId { get; set; }
         public string? ZoneCode { get; set; }
+        public string? AmbientAudioUrl { get; set; }
+        public string? AmbientAudioTitle { get; set; }
+        public string? SpotifyUrl { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 }

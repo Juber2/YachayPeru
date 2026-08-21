@@ -35,6 +35,8 @@ namespace YachayPeru.Application.Actions.Courses
                 Title = input.Title,
                 Description = input.Description,
                 ZoneCode = input.ZoneCode,
+                AmbientAudioTitle = input.AmbientAudioTitle,
+                SpotifyUrl = input.SpotifyUrl,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = currentUser.Id
@@ -69,6 +71,8 @@ namespace YachayPeru.Application.Actions.Courses
             course.Description = input.Description;
             course.IsActive = input.IsActive;
             course.ZoneCode = input.ZoneCode;
+            course.AmbientAudioTitle = input.AmbientAudioTitle;
+            course.SpotifyUrl = input.SpotifyUrl;
             course.UpdatedAt = DateTime.UtcNow;
             course.UpdatedBy = currentUser.Id;
 
